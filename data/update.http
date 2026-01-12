@@ -3,28 +3,13 @@ PUT https://gcbanner-h2evgna4awawfqb6.canadacentral-01.azurewebsites.net/api/mes
 Content-Type: application/json
 
 [
-  {
-    "id": "demo-1",
-    "startDateTime": "2026-01-09T00:00:00",
-    "endDateTime": "2026-01-12T23:59:59",
-    "type": "BANNER",
-    "status": "ON",
-    "severity": "INFO",
-    "messageEn": "Updated from Postman",
-    "messageFr": "Mis à jour depuis Postman",
-    "createdBy": "you",
-    "createdAt": "2026-01-12T12:00:00"
-  },
-    {
-    "id": "demo-2",
-    "startDateTime": "2026-01-09T00:00:00",
-    "endDateTime": "2026-01-12T23:59:59",
-    "type": "BANNER",
-    "status": "OFF",
-    "severity": "INFO",
-    "messageEn": "Test2",
-    "messageFr": "Test2FR",
-    "createdBy": "me",
-    "createdAt": "2026-01-12T12:00:00"
-  }
+{
+  "id": "demo-1",
+  "site": "www.dfo.com",
+  "render": "HTML",
+  "type": "banner",
+  "status": "ON",
+  "messageEn": "Hello! This is English",
+  "messageFr": "Salut! This is French"
+}
 ]

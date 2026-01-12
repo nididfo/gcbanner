@@ -89,4 +89,25 @@ public class MessageController {
                 .replace("\"", "&quot;")
                 .replace("'", "&#39;");
     }
+
+    @GetMapping(value = "/site.js", produces = "application/javascript")
+    public String getForSiteJs(
+            @RequestParam("site") String site,
+            @RequestParam(value = "lang", defaultValue = "en") String lang
+    ) {
+        List<SiteMessage> active = store.readActiveForSite(site);
+
+        boolean wantsHtml = active.stream()
+                .anyMatch(m -> "HTML".equalsIgnoreCase(m.getRender()));
+
+        if (!wantsHtml) return "";
+
+        String html = buildHtml(active, lang)
+                .replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("\n", "");
+
+        return "document.write('" + html + "');";
+    }
+
 }
