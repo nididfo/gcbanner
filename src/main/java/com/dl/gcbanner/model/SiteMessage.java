@@ -4,12 +4,15 @@ import java.time.LocalDateTime;
 
 public class SiteMessage {
     private String id;
+    private String site;          // NEW: site key, e.g. "chartgo.com"
+    private String render;        // NEW: "HTML" or "JSON"
+
     private LocalDateTime startDateTime;
     private LocalDateTime endDateTime;
 
-    private String type;     // BANNER, MODAL, TOAST, etc.
-    private String status;   // ON, OFF
-    private String severity; // INFO, WARNING, ERROR
+    private String type;          // used as CSS class in HTML: <div class="${type}">
+    private String status;        // ON, OFF
+    private String severity;      // INFO, WARNING, ERROR (optional)
 
     private String messageEn;
     private String messageFr;
@@ -19,6 +22,12 @@ public class SiteMessage {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+
+    public String getSite() { return site; }
+    public void setSite(String site) { this.site = site; }
+
+    public String getRender() { return render; }
+    public void setRender(String render) { this.render = render; }
 
     public LocalDateTime getStartDateTime() { return startDateTime; }
     public void setStartDateTime(LocalDateTime startDateTime) { this.startDateTime = startDateTime; }
