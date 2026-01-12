@@ -1,0 +1,5 @@
+server:
+  port: 8080
+
+messages:
+  file: data/messages.json

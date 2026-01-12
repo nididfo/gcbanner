@@ -1,0 +1,14 @@
+[
+  {
+    "id": "demo-1",
+    "startDateTime": "2026-01-09T00:00:00",
+    "endDateTime": "2026-01-12T23:59:59",
+    "type": "BANNER",
+    "status": "ON",
+    "severity": "INFO",
+    "messageEn": "Welcome! This is a demo banner.",
+    "messageFr": "Bienvenue! Ceci est une bannière de démo.",
+    "createdBy": "system",
+    "createdAt": "2026-01-09T12:00:00"
+  }
+]
