@@ -8,6 +8,6 @@ public class PortalController {
 
     @GetMapping("/portal")
     public String portal() {
-        return "redirect:/portal.html";
+        return "forward:/portal.html";
     }
 }
