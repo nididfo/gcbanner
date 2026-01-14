@@ -187,4 +187,34 @@ public class MessageController {
     private String escapeAttr(String s) {
         return escapeHtml(s);
     }
+
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public SiteMessage create(@RequestBody SiteMessage message) {
+        return store.upsert(message);
+    }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public SiteMessage updateOne(
+            @PathVariable("id") String id,
+            @RequestParam("site") String site,
+            @RequestBody SiteMessage message
+    ) {
+        // enforce path/query identity
+        message.setId(id);
+        message.setSite(site);
+        return store.upsert(message);
+    }
+
+    @DeleteMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> deleteOne(
+            @PathVariable("id") String id,
+            @RequestParam("site") String site
+    ) {
+        boolean removed = store.deleteBySiteAndId(site, id);
+        if (!removed) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok().build();
+    }
+
+
+
 }

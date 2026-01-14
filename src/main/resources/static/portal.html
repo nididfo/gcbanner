@@ -3,76 +3,179 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>GC Banner JSON Editor</title>
+    <title>GC Banner Admin</title>
 
-    <!-- Bootstrap (no build step) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f6f7f9; }
+        .sidebar { max-height: calc(100vh - 160px); overflow: auto; }
+        .monosmall { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 0.9rem; }
+        .list-id { font-family: ui-monospace, Menlo, Consolas, monospace; }
+        .soft { color: #6c757d; }
+        .required::after { content: " *"; color: #dc3545; }
+    </style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
+<div class="container-fluid py-3">
+    <div class="row g-3">
 
-            <div class="d-flex align-items-center justify-content-between mb-3">
-                <h1 class="h4 m-0">GC Banner – messages.json editor</h1>
-                <span class="badge text-bg-secondary" id="envBadge">Not loaded</span>
+        <!-- Top bar -->
+        <div class="col-12">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div>
+                    <h1 class="h4 mb-0">GC Banner – Admin</h1>
+                    <div class="soft small">Edit messages by site & id (CRUD). For demo use only.</div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <input id="apiBase" class="form-control form-control-sm" style="width: 440px;"
+                           value="https://gcbanner-h2evgna4awawfqb6.canadacentral-01.azurewebsites.net"
+                           placeholder="https://your-api.azurewebsites.net" />
+                    <button id="btnReload" class="btn btn-outline-primary btn-sm">Reload</button>
+                    <button id="btnNew" class="btn btn-success btn-sm">+ New</button>
+                    <button id="btnSaveAll" class="btn btn-outline-secondary btn-sm">Save All (bulk)</button>
+                </div>
             </div>
+        </div>
 
+        <!-- Sidebar -->
+        <div class="col-12 col-lg-4 col-xl-3">
             <div class="card shadow-sm">
                 <div class="card-body">
 
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-8">
-                            <label class="form-label">API Base URL</label>
-                            <input id="apiBase" class="form-control"
-                                   value="https://gcbanner-h2evgna4awawfqb6.canadacentral-01.azurewebsites.net"
-                                   placeholder="https://your-api.azurewebsites.net" />
-                            <div class="form-text">
-                                This page will call <code>{base}/api/messages</code> (GET + PUT).
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Optional Auth Token</label>
-                            <input id="authToken" class="form-control" placeholder="leave blank if not used">
-                            <div class="form-text">
-                                If you later protect the API, paste a token here (sent as <code>Authorization: Bearer ...</code>).
-                            </div>
-                        </div>
+                    <div class="input-group input-group-sm mb-2">
+                        <span class="input-group-text">Filter</span>
+                        <input id="filter" class="form-control" placeholder="type to filter (site/id/title/message)">
+                        <button id="btnClearFilter" class="btn btn-outline-secondary">Clear</button>
                     </div>
 
-                    <div class="mb-2 d-flex gap-2">
-                        <button id="btnReload" class="btn btn-outline-primary btn-sm">Reload</button>
-                        <button id="btnFormat" class="btn btn-outline-secondary btn-sm">Format JSON</button>
-                        <button id="btnUpdate" class="btn btn-primary btn-sm">Update (PUT)</button>
-                        <span class="ms-auto small text-muted" id="lastLoaded"></span>
-                    </div>
-
-                    <textarea id="jsonArea" class="form-control font-monospace" rows="18"
-                              spellcheck="false" placeholder="Loading..." style="font-family: courier; font-size:12px;"></textarea>
-
-                    <div class="mt-3">
-                        <div id="status" class="alert d-none" role="alert"></div>
-                    </div>
-
-                    <details class="mt-2">
-                        <summary class="small text-muted">Tips</summary>
-                        <ul class="small text-muted mt-2 mb-0">
-                            <li>Make sure the text is a JSON <strong>array</strong> (starts with <code>[</code> and ends with <code>]</code>).</li>
-                            <li>If you host this page on a different domain than the API, you may need CORS enabled on the API.</li>
-                        </ul>
-                    </details>
+                    <div id="menu" class="sidebar"></div>
 
                 </div>
             </div>
-
         </div>
+
+        <!-- Editor -->
+        <div class="col-12 col-lg-8 col-xl-9">
+            <div class="card shadow-sm">
+                <div class="card-body">
+
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div>
+                            <div class="small soft" id="selectedKey">No selection</div>
+                            <h2 class="h5 mb-0" id="editorTitle">Select a message</h2>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button id="btnDelete" class="btn btn-outline-danger btn-sm" disabled>Delete</button>
+                            <button id="btnSave" class="btn btn-primary btn-sm" disabled>Save</button>
+                        </div>
+                    </div>
+
+                    <div id="status" class="alert d-none" role="alert"></div>
+
+                    <form id="form" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label required">Site</label>
+                            <input id="site" class="form-control" placeholder="www.dfo.com" required>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label required">Id</label>
+                            <input id="id" class="form-control" placeholder="salmon-success" required>
+                            <div class="form-text">Id should be unique per site.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Render</label>
+                            <select id="render" class="form-select">
+                                <option value="HTML">HTML</option>
+                                <option value="JSON">JSON</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label required">Status</label>
+                            <select id="statusField" class="form-select" required>
+                                <option value="ON">ON</option>
+                                <option value="OFF">OFF</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label required">Type</label>
+                            <select id="type" class="form-select" required>
+                                <option value="success">success</option>
+                                <option value="info">info</option>
+                                <option value="warning">warning</option>
+                                <option value="error">error</option>
+                            </select>
+                            <div class="form-text">GC Design mapping: error → danger</div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Start</label>
+                            <input id="startDateTime" class="form-control monosmall" placeholder="2026-01-09T00:00:00">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">End</label>
+                            <input id="endDateTime" class="form-control monosmall" placeholder="2026-01-12T23:59:59">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Title (EN)</label>
+                            <input id="titleEn" class="form-control" placeholder="Title Success EN">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Title (FR)</label>
+                            <input id="titleFr" class="form-control" placeholder="Titre succès FR">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label required">Message (EN)</label>
+                            <textarea id="messageEn" class="form-control" rows="3" required></textarea>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label required">Message (FR)</label>
+                            <textarea id="messageFr" class="form-control" rows="3" required></textarea>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Created By</label>
+                            <input id="createdBy" class="form-control" placeholder="DFO">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Created At</label>
+                            <input id="createdAt" class="form-control monosmall" placeholder="2026-01-09T12:00:00">
+                        </div>
+
+                        <div class="col-12">
+                            <details class="mt-2">
+                                <summary class="small soft">Raw preview (JSON)</summary>
+                                <pre class="mt-2 p-2 bg-light border rounded monosmall" id="preview"></pre>
+                            </details>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
 <script>
     const $ = (id) => document.getElementById(id);
+
+    let allMessages = [];
+    let selected = null;      // currently selected object reference
+    let selectedKey = null;   // composite key "site|id"
+    let isNew = false;
 
     function showStatus(type, msg) {
         const el = $("status");
@@ -86,107 +189,399 @@
         $("status").classList.add("d-none");
     }
 
-    function getApiUrl(path) {
-        const base = $("apiBase").value.trim().replace(/\/+$/, "");
-        return base ? (base + path) : path; // if blank, use same-origin relative path
+    function apiBase() {
+        return $("apiBase").value.trim().replace(/\/+$/, "");
     }
 
-    function authHeaders() {
-        const token = $("authToken").value.trim();
-        return token ? { "Authorization": "Bearer " + token } : {};
+    function url(path) {
+        const base = apiBase();
+        return base ? (base + path) : path;
     }
 
-    async function loadJson() {
-        hideStatus();
-        $("jsonArea").value = "Loading...";
-        $("envBadge").textContent = "Loading...";
+    function normalize(v) {
+        return (v ?? "").toString().trim();
+    }
 
-        const url = getApiUrl("/api/messages");
-        try {
-            const res = await fetch(url, {
-                method: "GET",
-                headers: {
-                    "Accept": "application/json",
-                    ...authHeaders()
-                }
-            });
+    function keyOf(msg) {
+        return (normalize(msg.site).toLowerCase() + "|" + normalize(msg.id).toLowerCase());
+    }
 
-            if (!res.ok) {
-                const text = await res.text();
-                throw new Error(`GET failed (${res.status}) ${text}`);
-            }
+    function bySiteThenId(a, b) {
+        const as = normalize(a.site).toLowerCase();
+        const bs = normalize(b.site).toLowerCase();
+        if (as < bs) return -1;
+        if (as > bs) return 1;
+        const ai = normalize(a.id).toLowerCase();
+        const bi = normalize(b.id).toLowerCase();
+        return ai.localeCompare(bi);
+    }
 
-            const data = await res.json();
-            $("jsonArea").value = JSON.stringify(data, null, 2);
-            $("envBadge").textContent = "Loaded";
-            $("envBadge").className = "badge text-bg-success";
-            $("lastLoaded").textContent = "Last loaded: " + new Date().toLocaleString();
-            showStatus("success", "Loaded messages successfully.");
-        } catch (e) {
-            $("envBadge").textContent = "Error";
-            $("envBadge").className = "badge text-bg-danger";
-            $("jsonArea").value = "";
-            showStatus("danger", e.message || String(e));
+    function matchesFilter(m, q) {
+        if (!q) return true;
+        q = q.toLowerCase();
+        const bag = [
+            m.site, m.id, m.type, m.status, m.render,
+            m.titleEn, m.titleFr, m.messageEn, m.messageFr
+        ].map(x => (x ?? "").toString().toLowerCase()).join(" | ");
+        return bag.includes(q);
+    }
+
+    function groupBySite(list) {
+        const map = new Map();
+        for (const m of list) {
+            const s = normalize(m.site) || "(no site)";
+            if (!map.has(s)) map.set(s, []);
+            map.get(s).push(m);
         }
+        for (const [k, v] of map) v.sort(bySiteThenId);
+        return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0]));
     }
 
-    function formatJson() {
-        hideStatus();
-        try {
-            const parsed = JSON.parse($("jsonArea").value);
-            $("jsonArea").value = JSON.stringify(parsed, null, 2);
-            showStatus("secondary", "Formatted JSON.");
-        } catch (e) {
-            showStatus("warning", "JSON is not valid: " + (e.message || e));
-        }
-    }
+    function renderMenu() {
+        const q = normalize($("filter").value);
+        const list = allMessages.filter(m => matchesFilter(m, q)).sort(bySiteThenId);
+        const grouped = groupBySite(list);
 
-    async function updateJson() {
-        hideStatus();
-        const url = getApiUrl("/api/messages");
+        const menu = $("menu");
+        menu.innerHTML = "";
 
-        let parsed;
-        try {
-            parsed = JSON.parse($("jsonArea").value);
-            if (!Array.isArray(parsed)) {
-                showStatus("warning", "Body must be a JSON array (starts with [ ... ]).");
-                return;
-            }
-        } catch (e) {
-            showStatus("warning", "JSON is not valid: " + (e.message || e));
+        if (grouped.length === 0) {
+            menu.innerHTML = `<div class="text-muted small">No messages</div>`;
             return;
         }
 
-        try {
-            const res = await fetch(url, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    ...authHeaders()
-                },
-                body: JSON.stringify(parsed)
-            });
+        for (const [site, items] of grouped) {
+            const header = document.createElement("div");
+            header.className = "mt-2 mb-1 fw-semibold";
+            header.textContent = site;
+            menu.appendChild(header);
 
-            if (!res.ok) {
-                const text = await res.text();
-                throw new Error(`PUT failed (${res.status}) ${text}`);
+            const ul = document.createElement("div");
+            ul.className = "list-group list-group-flush mb-2";
+
+            for (const m of items) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "list-group-item list-group-item-action py-2";
+                const k = keyOf(m);
+                if (k === selectedKey) btn.classList.add("active");
+
+                const title = normalize(m.titleEn) || normalize(m.titleFr) || "";
+                const status = normalize(m.status).toUpperCase();
+                const type = normalize(m.type).toLowerCase();
+
+                btn.innerHTML = `
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="list-id">${escapeHtml(m.id || "(no id)")}</div>
+              <div class="small soft">${escapeHtml(title)}</div>
+            </div>
+            <div class="text-end">
+              <span class="badge ${status==="ON" ? "text-bg-success" : "text-bg-secondary"}">${status || "?"}</span>
+              <div class="small soft">${escapeHtml(type)}</div>
+            </div>
+          </div>
+        `;
+                btn.addEventListener("click", () => selectMessage(m));
+                ul.appendChild(btn);
             }
 
-            const saved = await res.json();
-            $("jsonArea").value = JSON.stringify(saved, null, 2);
-            showStatus("success", "Updated messages.json successfully.");
+            menu.appendChild(ul);
+        }
+    }
+
+    function selectMessage(m) {
+        isNew = false;
+        selected = m;
+        selectedKey = keyOf(m);
+
+        $("selectedKey").textContent = selectedKey;
+        $("editorTitle").textContent = `${m.site} / ${m.id}`;
+
+        // populate fields
+        $("site").value = m.site ?? "";
+        $("id").value = m.id ?? "";
+        $("render").value = (m.render ?? "HTML");
+        $("statusField").value = (m.status ?? "ON");
+        $("type").value = (m.type ?? "info");
+        $("startDateTime").value = m.startDateTime ?? "";
+        $("endDateTime").value = m.endDateTime ?? "";
+        $("titleEn").value = m.titleEn ?? "";
+        $("titleFr").value = m.titleFr ?? "";
+        $("messageEn").value = m.messageEn ?? "";
+        $("messageFr").value = m.messageFr ?? "";
+        $("createdBy").value = m.createdBy ?? "";
+        $("createdAt").value = m.createdAt ?? "";
+
+        $("btnSave").disabled = false;
+        $("btnDelete").disabled = false;
+
+        updatePreview();
+        renderMenu();
+    }
+
+    function newMessage() {
+        hideStatus();
+        isNew = true;
+        selected = {
+            id: "",
+            site: "",
+            render: "HTML",
+            startDateTime: null,
+            endDateTime: null,
+            type: "info",
+            status: "ON",
+            severity: null,
+            titleEn: "",
+            titleFr: "",
+            messageEn: "",
+            messageFr: "",
+            createdBy: "",
+            createdAt: null
+        };
+        selectedKey = null;
+
+        $("selectedKey").textContent = "new";
+        $("editorTitle").textContent = "New message";
+
+        // clear fields
+        $("site").value = "";
+        $("id").value = "";
+        $("render").value = "HTML";
+        $("statusField").value = "ON";
+        $("type").value = "info";
+        $("startDateTime").value = "";
+        $("endDateTime").value = "";
+        $("titleEn").value = "";
+        $("titleFr").value = "";
+        $("messageEn").value = "";
+        $("messageFr").value = "";
+        $("createdBy").value = "";
+        $("createdAt").value = "";
+
+        $("btnSave").disabled = false;
+        $("btnDelete").disabled = true;
+
+        updatePreview();
+        renderMenu();
+    }
+
+    function collectForm() {
+        // keep nulls as null where appropriate
+        const obj = {
+            site: normalize($("site").value),
+            id: normalize($("id").value),
+            render: normalize($("render").value) || "HTML",
+            status: normalize($("statusField").value) || "ON",
+            type: normalize($("type").value) || "info",
+            startDateTime: normalize($("startDateTime").value) || null,
+            endDateTime: normalize($("endDateTime").value) || null,
+            severity: null,
+            titleEn: normalize($("titleEn").value) || null,
+            titleFr: normalize($("titleFr").value) || null,
+            messageEn: normalize($("messageEn").value),
+            messageFr: normalize($("messageFr").value),
+            createdBy: normalize($("createdBy").value) || null,
+            createdAt: normalize($("createdAt").value) || null
+        };
+
+        // minimal validation
+        if (!obj.site) throw new Error("Site is required.");
+        if (!obj.id) throw new Error("Id is required.");
+        if (!obj.messageEn) throw new Error("Message (EN) is required.");
+        if (!obj.messageFr) throw new Error("Message (FR) is required.");
+
+        return obj;
+    }
+
+    function updatePreview() {
+        try {
+            const obj = collectForm();
+            $("preview").textContent = JSON.stringify(obj, null, 2);
+        } catch {
+            $("preview").textContent = "";
+        }
+    }
+
+    async function loadAll() {
+        hideStatus();
+        $("menu").innerHTML = `<div class="text-muted small">Loading…</div>`;
+
+        try {
+            const res = await fetch(url("/api/messages"), {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`GET /api/messages failed (${res.status}) ${text}`);
+            }
+            allMessages = await res.json();
+            if (!Array.isArray(allMessages)) allMessages = [];
+            allMessages.sort(bySiteThenId);
+
+            // if currently selected, reselect by key
+            if (selectedKey) {
+                const found = allMessages.find(m => keyOf(m) === selectedKey);
+                if (found) selectMessage(found);
+                else {
+                    selected = null;
+                    selectedKey = null;
+                    $("editorTitle").textContent = "Select a message";
+                    $("selectedKey").textContent = "No selection";
+                    $("btnSave").disabled = true;
+                    $("btnDelete").disabled = true;
+                }
+            }
+
+            renderMenu();
+            showStatus("success", "Loaded messages.");
+        } catch (e) {
+            renderMenu();
+            showStatus("danger", e.message || String(e));
+        }
+    }
+
+    async function saveOne() {
+        hideStatus();
+        try {
+            const obj = collectForm();
+
+            if (isNew) {
+                // CREATE (POST /api/messages)
+                const res = await fetch(url("/api/messages"), {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify(obj)
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(`POST failed (${res.status}) ${text}`);
+                }
+                const saved = await res.json();
+                showStatus("success", "Created.");
+            } else {
+                // UPDATE (PUT /api/messages/{id}?site=...)
+                const encodedId = encodeURIComponent(obj.id);
+                const encodedSite = encodeURIComponent(obj.site);
+                const res = await fetch(url(`/api/messages/${encodedId}?site=${encodedSite}`), {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify(obj)
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(`PUT failed (${res.status}) ${text}`);
+                }
+                const saved = await res.json();
+                showStatus("success", "Updated.");
+            }
+
+            isNew = false;
+            await loadAll();
+            // reselect after reload
+            const k = keyOf(obj);
+            const found = allMessages.find(m => keyOf(m) === k);
+            if (found) selectMessage(found);
         } catch (e) {
             showStatus("danger", e.message || String(e));
         }
     }
 
-    $("btnReload").addEventListener("click", loadJson);
-    $("btnFormat").addEventListener("click", formatJson);
-    $("btnUpdate").addEventListener("click", updateJson);
+    async function deleteOne() {
+        hideStatus();
+        try {
+            if (!selected) return;
 
-    // Load on page open
-    loadJson();
+            const site = normalize($("site").value);
+            const id = normalize($("id").value);
+            if (!site || !id) throw new Error("Missing site or id.");
+
+            if (!confirm(`Delete ${site} / ${id}?`)) return;
+
+            const res = await fetch(url(`/api/messages/${encodeURIComponent(id)}?site=${encodeURIComponent(site)}`), {
+                method: "DELETE",
+                headers: { "Accept": "application/json" }
+            });
+
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`DELETE failed (${res.status}) ${text}`);
+            }
+
+            selected = null;
+            selectedKey = null;
+            $("btnSave").disabled = true;
+            $("btnDelete").disabled = true;
+            $("editorTitle").textContent = "Select a message";
+            $("selectedKey").textContent = "No selection";
+
+            showStatus("success", "Deleted.");
+            await loadAll();
+        } catch (e) {
+            showStatus("danger", e.message || String(e));
+        }
+    }
+
+    async function saveAllBulk() {
+        hideStatus();
+        try {
+            // For bulk, we reload from server first (avoids overwriting other admin changes)
+            const res1 = await fetch(url("/api/messages"), { method:"GET", headers:{ "Accept":"application/json" }});
+            if (!res1.ok) throw new Error("Bulk: failed to load current messages");
+            const current = await res1.json();
+
+            // If you want bulk edits, you can extend this to keep a local draft copy.
+            // For now, bulk just re-saves as-is (handy for verifying PUT works).
+            const res2 = await fetch(url("/api/messages"), {
+                method:"PUT",
+                headers:{ "Content-Type":"application/json", "Accept":"application/json" },
+                body: JSON.stringify(current)
+            });
+            if (!res2.ok) {
+                const text = await res2.text();
+                throw new Error(`Bulk PUT failed (${res2.status}) ${text}`);
+            }
+            showStatus("success", "Bulk save completed.");
+            await loadAll();
+        } catch (e) {
+            showStatus("danger", e.message || String(e));
+        }
+    }
+
+    function escapeHtml(s) {
+        return (s ?? "").toString()
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    // wire up
+    $("btnReload").addEventListener("click", loadAll);
+    $("btnNew").addEventListener("click", newMessage);
+    $("btnSave").addEventListener("click", saveOne);
+    $("btnDelete").addEventListener("click", deleteOne);
+    $("btnSaveAll").addEventListener("click", saveAllBulk);
+
+    $("filter").addEventListener("input", renderMenu);
+    $("btnClearFilter").addEventListener("click", () => { $("filter").value=""; renderMenu(); });
+
+    // live preview
+    for (const id of ["site","id","render","statusField","type","startDateTime","endDateTime","titleEn","titleFr","messageEn","messageFr","createdBy","createdAt"]) {
+        $(id).addEventListener("input", updatePreview);
+        $(id).addEventListener("change", updatePreview);
+    }
+
+    // initial load
+    loadAll();
 </script>
 
 </body>

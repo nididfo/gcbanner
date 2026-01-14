@@ -102,4 +102,48 @@ public class MessageStore {
         if (s == null) return "";
         return s.trim().toLowerCase();
     }
+
+    public SiteMessage upsert(SiteMessage incoming) {
+        List<SiteMessage> all = readAll();
+
+        String site = (incoming.getSite() == null) ? "" : incoming.getSite().trim().toLowerCase();
+        String id = (incoming.getId() == null) ? "" : incoming.getId().trim().toLowerCase();
+
+        if (site.isBlank() || id.isBlank()) {
+            throw new IllegalArgumentException("site and id are required");
+        }
+
+        int idx = -1;
+        for (int i = 0; i < all.size(); i++) {
+            SiteMessage m = all.get(i);
+            String ms = (m.getSite() == null) ? "" : m.getSite().trim().toLowerCase();
+            String mi = (m.getId() == null) ? "" : m.getId().trim().toLowerCase();
+            if (ms.equals(site) && mi.equals(id)) {
+                idx = i;
+                break;
+            }
+        }
+
+        if (idx >= 0) all.set(idx, incoming);
+        else all.add(incoming);
+
+        replaceAll(all);
+        return incoming;
+    }
+
+    public boolean deleteBySiteAndId(String site, String id) {
+        List<SiteMessage> all = readAll();
+        String s = (site == null) ? "" : site.trim().toLowerCase();
+        String i = (id == null) ? "" : id.trim().toLowerCase();
+
+        boolean removed = all.removeIf(m -> {
+            String ms = (m.getSite() == null) ? "" : m.getSite().trim().toLowerCase();
+            String mi = (m.getId() == null) ? "" : m.getId().trim().toLowerCase();
+            return ms.equals(s) && mi.equals(i);
+        });
+
+        if (removed) replaceAll(all);
+        return removed;
+    }
+
 }
