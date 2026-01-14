@@ -4,15 +4,22 @@ import java.time.LocalDateTime;
 
 public class SiteMessage {
     private String id;
-    private String site;          // NEW: site key, e.g. "chartgo.com"
-    private String render;        // NEW: "HTML" or "JSON"
+
+    private String site;          // e.g. "www.dfo.com"
+    private String render;        // "HTML" or "JSON"
 
     private LocalDateTime startDateTime;
     private LocalDateTime endDateTime;
 
-    private String type;          // used as CSS class in HTML: <div class="${type}">
+    // For GC Design System notice type mapping:
+    // success, warning, error, info
+    private String type;
+
     private String status;        // ON, OFF
-    private String severity;      // INFO, WARNING, ERROR (optional)
+    private String severity;      // optional
+
+    private String titleEn;       // NEW
+    private String titleFr;       // NEW
 
     private String messageEn;
     private String messageFr;
@@ -43,6 +50,12 @@ public class SiteMessage {
 
     public String getSeverity() { return severity; }
     public void setSeverity(String severity) { this.severity = severity; }
+
+    public String getTitleEn() { return titleEn; }
+    public void setTitleEn(String titleEn) { this.titleEn = titleEn; }
+
+    public String getTitleFr() { return titleFr; }
+    public void setTitleFr(String titleFr) { this.titleFr = titleFr; }
 
     public String getMessageEn() { return messageEn; }
     public void setMessageEn(String messageEn) { this.messageEn = messageEn; }

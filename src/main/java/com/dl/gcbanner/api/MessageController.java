@@ -29,17 +29,19 @@ public class MessageController {
     }
 
     /**
-     * Pass site=... and optional lang=en|fr
-     * - if any active message for that site has render=HTML -> return HTML divs
+     * Pass site=... and optional lang=en|fr and optional format=simple|gcdesign
+     *
+     * - if any active message for that site has render=HTML -> return HTML
      * - otherwise return JSON list
      *
      * Example:
-     *   /api/messages/site?site=chartgo.com&lang=en
+     *   /api/messages/site?site=www.dfo.com&lang=fr&format=gcdesign
      */
     @GetMapping("/site")
     public ResponseEntity<?> getForSite(
             @RequestParam("site") String site,
-            @RequestParam(value = "lang", defaultValue = "en") String lang
+            @RequestParam(value = "lang", defaultValue = "en") String lang,
+            @RequestParam(value = "format", defaultValue = "simple") String format
     ) {
         List<SiteMessage> active = store.readActiveForSite(site);
 
@@ -47,7 +49,7 @@ public class MessageController {
                 .anyMatch(m -> m.getRender() != null && m.getRender().equalsIgnoreCase("HTML"));
 
         if (wantsHtml) {
-            String html = buildHtml(active, lang);
+            String html = buildHtml(active, lang, format);
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_HTML)
                     .body(html);
@@ -58,13 +60,54 @@ public class MessageController {
                 .body(active);
     }
 
-    private String buildHtml(List<SiteMessage> messages, String lang) {
-        StringBuilder sb = new StringBuilder();
+    /**
+     * Script tag endpoint:
+     * <script src=".../api/messages/site.js?site=www.dfo.com&lang=fr&format=gcdesign"></script>
+     */
+    @GetMapping(value = "/site.js", produces = "application/javascript")
+    public String getForSiteJs(
+            @RequestParam("site") String site,
+            @RequestParam(value = "lang", defaultValue = "en") String lang,
+            @RequestParam(value = "format", defaultValue = "simple") String format
+    ) {
+        List<SiteMessage> active = store.readActiveForSite(site);
+
+        boolean wantsHtml = active.stream()
+                .anyMatch(m -> "HTML".equalsIgnoreCase(m.getRender()));
+
+        if (!wantsHtml) return "";
+
+        String html = buildHtml(active, lang, format);
+
+        // Escape for JS single-quoted string
+        String jsSafe = html
+                .replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("\r", "")
+                .replace("\n", "");
+
+        return "document.write('" + jsSafe + "');";
+    }
+
+    private String buildHtml(List<SiteMessage> messages, String lang, String format) {
         String l = (lang == null) ? "en" : lang.trim().toLowerCase();
+        String f = (format == null) ? "simple" : format.trim().toLowerCase();
+
+        if ("gcdesign".equals(f) || "gcds".equals(f) || "gc".equals(f)) {
+            return buildGcDesignHtml(messages, l);
+        }
+
+        // fallback: original simple HTML
+        return buildSimpleDivHtml(messages, l);
+    }
+
+    private String buildSimpleDivHtml(List<SiteMessage> messages, String lang) {
+        StringBuilder sb = new StringBuilder();
 
         for (SiteMessage m : messages) {
             String cssClass = safeAttr(m.getType());
-            String msg = "fr".equals(l) ? m.getMessageFr() : m.getMessageEn();
+            String msg = "fr".equals(lang) ? m.getMessageFr() : m.getMessageEn();
+
             sb.append("<div class=\"")
                     .append(cssClass)
                     .append("\">")
@@ -74,13 +117,63 @@ public class MessageController {
         return sb.toString();
     }
 
-    // prevents breaking the class attribute (very basic safety)
+    private String buildGcDesignHtml(List<SiteMessage> messages, String lang) {
+        StringBuilder sb = new StringBuilder();
+
+        for (SiteMessage m : messages) {
+            String noticeType = toGcdsNoticeType(m.getType());
+            String title = "fr".equals(lang) ? m.getTitleFr() : m.getTitleEn();
+            String msg = "fr".equals(lang) ? m.getMessageFr() : m.getMessageEn();
+
+            // Optional: if title is missing, set a harmless default
+            if (title == null || title.isBlank()) {
+                title = defaultTitleForType(noticeType, lang);
+            }
+
+            sb.append("<gcds-notice")
+                    .append(" type=\"").append(escapeAttr(noticeType)).append("\"")
+                    .append(" notice-title-tag=\"h2\"")
+                    .append(" notice-title=\"").append(escapeAttr(title)).append("\">")
+                    .append("<gcds-text>")
+                    .append(escapeHtml(msg))
+                    .append("</gcds-text>")
+                    .append("</gcds-notice>");
+        }
+
+        return sb.toString();
+    }
+
+    // success|warning|danger|info
+    private String toGcdsNoticeType(String type) {
+        if (type == null) return "info";
+        String t = type.trim().toLowerCase();
+
+        return switch (t) {
+            case "success" -> "success";
+            case "warning" -> "warning";
+            case "error", "danger" -> "danger"; // your rule: error => danger
+            case "info" -> "info";
+            default -> "info";
+        };
+    }
+
+    private String defaultTitleForType(String noticeType, String lang) {
+        boolean fr = "fr".equals(lang);
+        return switch (noticeType) {
+            case "success" -> fr ? "Succès" : "Success";
+            case "warning" -> fr ? "Avertissement" : "Warning";
+            case "danger"  -> fr ? "Erreur" : "Error";
+            default        -> fr ? "Info" : "Info";
+        };
+    }
+
+    // prevents breaking attributes in a basic way
     private String safeAttr(String s) {
         if (s == null) return "";
         return s.replaceAll("[^a-zA-Z0-9_-]", "");
     }
 
-    // basic HTML escaping so messages can't inject HTML/JS
+    // HTML escaping for inner text
     private String escapeHtml(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;")
@@ -90,24 +183,8 @@ public class MessageController {
                 .replace("'", "&#39;");
     }
 
-    @GetMapping(value = "/site.js", produces = "application/javascript")
-    public String getForSiteJs(
-            @RequestParam("site") String site,
-            @RequestParam(value = "lang", defaultValue = "en") String lang
-    ) {
-        List<SiteMessage> active = store.readActiveForSite(site);
-
-        boolean wantsHtml = active.stream()
-                .anyMatch(m -> "HTML".equalsIgnoreCase(m.getRender()));
-
-        if (!wantsHtml) return "";
-
-        String html = buildHtml(active, lang)
-                .replace("\\", "\\\\")
-                .replace("'", "\\'")
-                .replace("\n", "");
-
-        return "document.write('" + html + "');";
+    // Attribute escaping (more strict than inner text)
+    private String escapeAttr(String s) {
+        return escapeHtml(s);
     }
-
 }
